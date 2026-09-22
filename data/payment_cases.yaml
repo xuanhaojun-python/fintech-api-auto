@@ -1,0 +1,41 @@
+# 支付场景参数化测试数据
+
+standard_payment:
+  - id: "TC-PAY-001"
+    desc: "USDT 标准支付，无 Travel Rule"
+    amount: 100.0
+    currency: "USDT"
+    payer_name: "Alice"
+    payer_email: "alice@example.com"
+    payer_address: "0xALICE_ADDR"
+    travel_rule: "No"
+
+  - id: "TC-PAY-002"
+    desc: "小额 USDT 支付"
+    amount: 1.0
+    currency: "USDT"
+    payer_name: "Bob"
+    payer_email: "bob@example.com"
+    payer_address: "0xBOB_ADDR"
+    travel_rule: "No"
+
+  - id: "TC-PAY-003"
+    desc: "大额支付，触发 Travel Rule"
+    amount: 10000.0
+    currency: "USDT"
+    payer_name: "Charlie"
+    payer_email: "charlie@example.com"
+    payer_address: "0xCHARLIE_ADDR"
+    travel_rule: "Yes"
+
+travel_rule_info:
+  payer_name: "Charlie"
+  payer_wallet_provider: "WalletCo"
+  payer_wallet_address: "0xCHARLIE_ADDR"
+  payer_country: "SG"
+
+ln_hit_payer:
+  payer_name: "LN_HIT_USER"
+  payer_email: "ln_hit@example.com"
+  payer_address: "0xLN_HIT_ADDR"
+  amount: 500.0

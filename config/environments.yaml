@@ -1,0 +1,16 @@
+sit:
+  base_url: https://api1.sit.planckage.cc/openapi
+  timeout: 10
+  auth_url: https://www1.sit.planckage.cc/login
+  file-md5: 5f83844369d1c325edaa4150a29db379
+
+uat:
+  base_url: https://api1.uat.planckage.cc/openapi
+  timeout: 15
+  auth_url: https://auth.uat.planckage.cc/login
+
+dev:
+  base_url: https://api1.dev.planckage.cc/openapi
+  timeout: 60
+  auth_url: https://www1.dev.planckage.cc/login
+  ssl_verify: false

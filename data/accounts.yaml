@@ -1,0 +1,42 @@
+# 测试账户数据（各种账户状态）
+
+valid:
+  externalAccountId: "testjimmmy124321"
+  registeredEmail: "jimmy_xuan@leptage.com"
+
+active:
+  externalAccountId: "test_active_001"
+  registeredEmail: "active_user@leptage.com"
+
+suspended:
+  externalAccountId: "test_suspended_001"
+  registeredEmail: "suspended_user@leptage.com"
+
+terminal:
+  externalAccountId: "test_terminal_001"
+  registeredEmail: "terminal_user@leptage.com"
+
+closed:
+  externalAccountId: "test_terminal_001"
+  registeredEmail: "terminal_user@leptage.com"
+
+withdraw_only:
+  externalAccountId: "test_withdraw_001"
+  registeredEmail: "withdraw_user@leptage.com"
+
+smart_payment_enabled:
+  externalAccountId: "test_sp_enabled_001"
+  registeredEmail: "sp_enabled@leptage.com"
+
+pdca:
+  externalAccountId: "test_pdca_001"
+  registeredEmail: "pdca_user@leptage.com"
+
+pdca_create:
+  externalAccountId: "testjimmmy12290201"
+  registeredEmail: "jimmy_xuan@leptage.com"
+
+merchant:
+  id: "merchant_001"
+  name: "Test Merchant"
+  email: "merchant@leptage.com"

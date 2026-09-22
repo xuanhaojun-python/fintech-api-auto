@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        env: [ sit ]   # 可改为 [sit, uat] 同时跑多环境
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run smoke tests
+        env:
+          TEST_ENV: ${{ matrix.env }}
+          SIT_ACCESS_KEY: ${{ secrets.SIT_ACCESS_KEY }}
+          SIT_SECRET_KEY: ${{ secrets.SIT_SECRET_KEY }}
+          UAT_ACCESS_KEY: ${{ secrets.UAT_ACCESS_KEY }}
+          UAT_SECRET_KEY: ${{ secrets.UAT_SECRET_KEY }}
+        run: |
+          pytest -m smoke \
+            --alluredir=reports/allure-results \
+            --html=reports/report.html \
+            --self-contained-html
+
+      - name: Upload Allure results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-results-${{ matrix.env }}
+          path: reports/allure-results/
+          retention-days: 7
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: html-report-${{ matrix.env }}
+          path: reports/report.html
+          retention-days: 7
