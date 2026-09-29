@@ -1,6 +1,6 @@
 """
 退款流程接口测试
-覆盖：查询退款 Case、风控审核、财务审核、完整退款流程
+覆盖：查询退款 Case、风控审核、财务审核、完整退款流程、查询退款交易
 """
 import pytest
 
@@ -320,3 +320,106 @@ class TestCompleteRefundFlow:
         body = assert_success(query_resp)
         status = body.get("data", {}).get("status")
         assert status == "Rejected", f"财务拒绝后 status 应为 Rejected，实际：{status}"
+
+
+VALID_REFUND_ORDER_ID = "PIT2037448401733287936"
+
+
+class TestGetRefundTxn:
+    """查询退款交易 GET /v1/payment/refund"""
+
+    @pytest.mark.smoke
+    def test_get_refund_txn_success(self, refund_api):
+        """TC-REF-401 查询已存在的退款交易，返回成功
+        预期结果：HTTP 200，code=0000，data 包含 refundOrderId
+        """
+        resp = refund_api.get_refund_txn(VALID_REFUND_ORDER_ID)
+        print(f"\n[TC-REF-401] {resp.status_code} {resp.json()}")
+        body = assert_success(resp)
+        assert body.get("data") is not None, f"data 不应为空：{body}"
+
+    @pytest.mark.regression
+    def test_get_refund_txn_refund_order_id_matches(self, refund_api):
+        """TC-REF-402 响应中 refundOrderId 与请求一致"""
+        resp = refund_api.get_refund_txn(VALID_REFUND_ORDER_ID)
+        data = assert_success(resp).get("data", {})
+        assert data.get("refundOrderId") == VALID_REFUND_ORDER_ID, \
+            f"refundOrderId 应为 {VALID_REFUND_ORDER_ID}，实际：{data.get('refundOrderId')}"
+
+    @pytest.mark.regression
+    def test_get_refund_txn_has_amount(self, refund_api):
+        """TC-REF-403 响应中 amount 不为空"""
+        resp = refund_api.get_refund_txn(VALID_REFUND_ORDER_ID)
+        data = assert_success(resp).get("data", {})
+        assert data.get("amount"), f"amount 不应为空：{data}"
+        assert float(data["amount"]) > 0, f"amount 应大于 0，实际：{data['amount']}"
+
+    @pytest.mark.regression
+    def test_get_refund_txn_ccy_is_string(self, refund_api):
+        """TC-REF-404 响应中 ccy 为非空字符串"""
+        resp = refund_api.get_refund_txn(VALID_REFUND_ORDER_ID)
+        data = assert_success(resp).get("data", {})
+        assert data.get("ccy"), f"ccy 不应为空：{data}"
+        assert isinstance(data["ccy"], str), f"ccy 应为字符串，实际：{data['ccy']}"
+
+    @pytest.mark.regression
+    def test_get_refund_txn_created_at_is_timestamp(self, refund_api):
+        """TC-REF-405 响应中 createdAt 为 13 位毫秒时间戳"""
+        resp = refund_api.get_refund_txn(VALID_REFUND_ORDER_ID)
+        data = assert_success(resp).get("data", {})
+        created_at = data.get("createdAt", 0)
+        assert isinstance(created_at, int) and created_at > 0, \
+            f"createdAt 应为正整数，实际：{created_at}"
+        assert len(str(created_at)) == 13, \
+            f"createdAt 应为 13 位毫秒时间戳，实际：{created_at}"
+
+    @pytest.mark.regression
+    def test_get_refund_txn_status_not_empty(self, refund_api):
+        """TC-REF-406 响应中 status 不为空"""
+        resp = refund_api.get_refund_txn(VALID_REFUND_ORDER_ID)
+        data = assert_success(resp).get("data", {})
+        assert data.get("status"), f"status 不应为空：{data}"
+
+    @pytest.mark.regression
+    def test_get_refund_txn_idempotent(self, refund_api):
+        """TC-REF-407 连续查询两次，返回相同结果（幂等）"""
+        resp1 = refund_api.get_refund_txn(VALID_REFUND_ORDER_ID)
+        resp2 = refund_api.get_refund_txn(VALID_REFUND_ORDER_ID)
+        data1 = assert_success(resp1).get("data", {})
+        data2 = assert_success(resp2).get("data", {})
+        assert data1.get("refundOrderId") == data2.get("refundOrderId"), \
+            f"两次查询 refundOrderId 不一致：{data1} vs {data2}"
+        assert data1.get("status") == data2.get("status"), \
+            f"两次查询 status 不一致：{data1.get('status')} vs {data2.get('status')}"
+
+    @pytest.mark.regression
+    def test_get_refund_txn_nonexistent_order(self, refund_api):
+        """TC-REF-408 查询不存在的 refundOrderId，返回业务错误
+        预期结果：HTTP 非 200 或 code≠0000
+        """
+        resp = refund_api.get_refund_txn("PIT0000000000000000000")
+        print(f"\n[TC-REF-408] {resp.status_code} {resp.json()}")
+        body = resp.json()
+        assert resp.status_code != 200 or body.get("code") != "0000", \
+            f"不存在的订单应返回错误，实际：{resp.status_code}，响应：{body}"
+
+    @pytest.mark.regression
+    def test_get_refund_txn_missing_param(self, refund_api):
+        """TC-REF-409 不传 refundOrderId 参数，返回 400
+        预期结果：HTTP 400，code=1000
+        """
+        resp = refund_api.get("/v1/payment/refund")
+        print(f"\n[TC-REF-409] {resp.status_code} {resp.json()}")
+        assert resp.status_code == 400, \
+            f"缺少参数应返回 400，实际：{resp.status_code}，响应：{resp.json()}"
+
+    @pytest.mark.regression
+    def test_get_refund_txn_invalid_format(self, refund_api):
+        """TC-REF-410 传入非法格式的 refundOrderId（非 PIT 开头），返回业务错误
+        预期结果：HTTP 400/404 或 code≠0000
+        """
+        resp = refund_api.get_refund_txn("invalid_order_id_001")
+        print(f"\n[TC-REF-410] {resp.status_code} {resp.json()}")
+        body = resp.json()
+        assert resp.status_code in [400, 404] or body.get("code") != "0000", \
+            f"非法格式 ID 应返回错误，实际：{resp.status_code}，响应：{body}"

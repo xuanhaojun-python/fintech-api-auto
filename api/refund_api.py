@@ -26,3 +26,7 @@ class RefundAPI(BaseClient):
             f"/v1/refund/case/{refund_case_id}/finance-review",
             json={"action": action},
         )
+
+    def get_refund_txn(self, refund_order_id: str):
+        """查询退款交易详情"""
+        return self.get("/v1/payment/refund", params={"refundOrderId": refund_order_id})
