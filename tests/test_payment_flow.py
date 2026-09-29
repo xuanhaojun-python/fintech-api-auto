@@ -174,6 +174,69 @@ class TestCreateLinkAbnormal:
         resp = payment_api.create_link(merchant["id"], "Alice", "alice@example.com", 0.0)
         assert resp.status_code in [400, 422] or resp.json().get("code") != 0
 
+    @pytest.mark.regression
+    def test_create_link_missing_payer_name(self, payment_api, accounts):
+        """TC-PAY-ERR-004 缺少 payerName，返回参数错误
+        请求体：缺少 payerName，其余字段完整
+        预期结果：HTTP 400/422 或 code≠0
+        """
+        merchant = accounts["merchant"]
+        resp = payment_api.post("/v1/smart-payment/link/create", json={
+            "merchantId": merchant["id"],
+            "payerEmail": "alice@example.com",
+            "amount": 100.0,
+            "currency": "USDT",
+        })
+        if resp.status_code == 404:
+            pytest.skip("smart-payment 接口在当前 SIT 环境未部署（404）")
+        assert resp.status_code in [400, 422] or resp.json().get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{resp.json()}"
+
+    @pytest.mark.regression
+    def test_create_link_missing_payer_email(self, payment_api, accounts):
+        """TC-PAY-ERR-005 缺少 payerEmail，返回参数错误
+        请求体：缺少 payerEmail，其余字段完整
+        预期结果：HTTP 400/422 或 code≠0
+        """
+        merchant = accounts["merchant"]
+        resp = payment_api.post("/v1/smart-payment/link/create", json={
+            "merchantId": merchant["id"],
+            "payerName": "Alice",
+            "amount": 100.0,
+            "currency": "USDT",
+        })
+        if resp.status_code == 404:
+            pytest.skip("smart-payment 接口在当前 SIT 环境未部署（404）")
+        assert resp.status_code in [400, 422] or resp.json().get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{resp.json()}"
+
+    @pytest.mark.regression
+    def test_create_link_invalid_email_format(self, payment_api, accounts):
+        """TC-PAY-ERR-006 payerEmail 格式非法，返回参数错误
+        请求体：payerEmail=not-an-email（无 @ 符号）
+        预期结果：HTTP 400/422 或 code≠0
+        """
+        merchant = accounts["merchant"]
+        resp = payment_api.create_link(merchant["id"], "Alice", "not-an-email", 100.0)
+        if resp.status_code == 404:
+            pytest.skip("smart-payment 接口在当前 SIT 环境未部署（404）")
+        assert resp.status_code in [400, 422] or resp.json().get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{resp.json()}"
+
+    @pytest.mark.regression
+    def test_create_link_invalid_currency(self, payment_api, accounts):
+        """TC-PAY-ERR-007 非法 currency 值，返回参数错误
+        请求体：currency=INVALID_COIN
+        预期结果：HTTP 400/422 或 code≠0
+        """
+        merchant = accounts["merchant"]
+        resp = payment_api.create_link(merchant["id"], "Alice", "alice@example.com", 100.0,
+                                       currency="INVALID_COIN")
+        if resp.status_code == 404:
+            pytest.skip("smart-payment 接口在当前 SIT 环境未部署（404）")
+        assert resp.status_code in [400, 422] or resp.json().get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{resp.json()}"
+
 
 class TestPaymentTxnQuery:
     """查询入金交易"""
@@ -267,6 +330,109 @@ class TestCreatePaymentRefund:
         body = resp.json()
         assert resp.status_code != 200 or body.get("code") != "0000"
 
+    @pytest.mark.regression
+    def test_create_refund_missing_payin_txn_id(self, payment_api):
+        """TC-PAY-REF-103 缺少 payinTxnId，返回参数错误
+        请求体：不传 payinTxnId，其余字段完整
+        预期结果：HTTP 400/422 或 code≠0000
+        """
+        resp = payment_api.post("/v1/payment/refund", json={
+            "refundOrderId": "REFUND_TEST_NO_PAYIN",
+            "originMerchantOrderId": "ORDER_TEST_003",
+            "fromAddress": "0x95bfad0967303a7b202143874b456e1c41a66bfe",
+            "toAddress": "0x714c93c1f732aa25639c3ae1035b1de361b5c3a4",
+            "txHash": "0x48cc54324094ca141774e674074bc9379ff9b876ff2ab668a21235fae76bf311",
+            "amount": "0.02",
+            "ccy": "USDT",
+            "protocol": "ETHEREUM",
+            "reason": "refund",
+        })
+        body = resp.json()
+        assert resp.status_code in [400, 422] or body.get("code") != "0000", \
+            f"实际 {resp.status_code}，响应：{body}"
+
+    @pytest.mark.regression
+    def test_create_refund_missing_to_address(self, payment_api):
+        """TC-PAY-REF-104 缺少 toAddress，返回参数错误
+        请求体：不传 toAddress，其余字段完整
+        预期结果：HTTP 400/422 或 code≠0000
+        """
+        resp = payment_api.post("/v1/payment/refund", json={
+            "payinTxnId": "PIT2071535440443215872",
+            "refundOrderId": "REFUND_TEST_NO_TO_ADDR",
+            "originMerchantOrderId": "ORDER_TEST_004",
+            "fromAddress": "0x95bfad0967303a7b202143874b456e1c41a66bfe",
+            "txHash": "0x48cc54324094ca141774e674074bc9379ff9b876ff2ab668a21235fae76bf311",
+            "amount": "0.02",
+            "ccy": "USDT",
+            "protocol": "ETHEREUM",
+            "reason": "refund",
+        })
+        body = resp.json()
+        assert resp.status_code in [400, 422] or body.get("code") != "0000", \
+            f"实际 {resp.status_code}，响应：{body}"
+
+    @pytest.mark.regression
+    def test_create_refund_missing_amount(self, payment_api):
+        """TC-PAY-REF-105 缺少 amount，返回参数错误
+        请求体：不传 amount，其余字段完整
+        预期结果：HTTP 400/422 或 code≠0000
+        """
+        resp = payment_api.post("/v1/payment/refund", json={
+            "payinTxnId": "PIT2071535440443215872",
+            "refundOrderId": "REFUND_TEST_NO_AMOUNT",
+            "originMerchantOrderId": "ORDER_TEST_005",
+            "fromAddress": "0x95bfad0967303a7b202143874b456e1c41a66bfe",
+            "toAddress": "0x714c93c1f732aa25639c3ae1035b1de361b5c3a4",
+            "txHash": "0x48cc54324094ca141774e674074bc9379ff9b876ff2ab668a21235fae76bf311",
+            "ccy": "USDT",
+            "protocol": "ETHEREUM",
+            "reason": "refund",
+        })
+        body = resp.json()
+        assert resp.status_code in [400, 422] or body.get("code") != "0000", \
+            f"实际 {resp.status_code}，响应：{body}"
+
+    @pytest.mark.regression
+    def test_create_refund_negative_amount(self, payment_api):
+        """TC-PAY-REF-106 amount 为负数，返回参数错误
+        请求体：amount=-0.01
+        预期结果：HTTP 400/422 或 code≠0000
+        """
+        resp = payment_api.refund(
+            payin_txn_id="PIT2071535440443215872",
+            refund_order_id="REFUND_TEST_NEG_AMOUNT",
+            origin_merchant_order_id="ORDER_TEST_006",
+            from_address="0x95bfad0967303a7b202143874b456e1c41a66bfe",
+            to_address="0x714c93c1f732aa25639c3ae1035b1de361b5c3a4",
+            tx_hash="0x48cc54324094ca141774e674074bc9379ff9b876ff2ab668a21235fae76bf311",
+            amount="-0.01",
+            reason="refund",
+        )
+        body = resp.json()
+        assert resp.status_code in [400, 422] or body.get("code") != "0000", \
+            f"实际 {resp.status_code}，响应：{body}"
+
+    @pytest.mark.regression
+    def test_create_refund_duplicate_order_id(self, payment_api):
+        """TC-PAY-REF-107 重复 refundOrderId（幂等性验证）
+        步骤：使用相同 refundOrderId 提交两次退款
+        预期结果：第二次返回已存在错误或幂等成功，不应报 500
+        """
+        kwargs = dict(
+            payin_txn_id="PIT2071535440443215872",
+            refund_order_id="REFUND_IDEMPOTENT_001",
+            origin_merchant_order_id="ORDER_TEST_007",
+            from_address="0x95bfad0967303a7b202143874b456e1c41a66bfe",
+            to_address="0x714c93c1f732aa25639c3ae1035b1de361b5c3a4",
+            tx_hash="0x48cc54324094ca141774e674074bc9379ff9b876ff2ab668a21235fae76bf311",
+            amount="0.02",
+            reason="refund",
+        )
+        payment_api.refund(**kwargs)
+        resp = payment_api.refund(**kwargs)
+        assert resp.status_code != 500, f"重复提交退款不应返回 500，实际：{resp.status_code}"
+
 
 class TestReceiptFlow:
     """交易凭证：查看与下载"""
@@ -311,3 +477,112 @@ class TestReceiptFlow:
         body = resp.json()
         assert resp.status_code != 200 or body.get("code") != "0000", \
             "不存在的 txnId 应返回业务错误"
+
+
+class TestGetLinkStatus:
+    """查询 Link 状态"""
+
+    @pytest.mark.smoke
+    def test_get_link_status_success(self, payment_api, accounts):
+        """TC-PAY-LNK-001 创建 Link 后正常查询状态
+        步骤：创建 Link → 查询 linkId 的状态
+        预期结果：HTTP 200，code=0，status 字段非空
+        """
+        merchant = accounts["merchant"]
+        resp = payment_api.create_link(merchant["id"], "Eve", "eve@example.com", 100.0)
+        if resp.status_code == 404:
+            pytest.skip("smart-payment 接口在当前 SIT 环境未部署（404）")
+        body = assert_success(resp)
+        link_id = body["data"]["linkId"]
+
+        resp = payment_api.get_link_status(link_id)
+        body = assert_success(resp)
+        assert body.get("data", {}).get("status"), "status 字段不应为空"
+
+    @pytest.mark.regression
+    def test_get_link_status_nonexistent(self, payment_api):
+        """TC-PAY-LNK-002 查询不存在的 linkId 状态，返回业务错误
+        请求：GET /v1/smart-payment/link/nonexistent_link_99999/status
+        预期结果：HTTP 非 200 或 code≠0
+        """
+        resp = payment_api.get_link_status("nonexistent_link_99999")
+        body = resp.json()
+        assert resp.status_code != 200 or body.get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{body}"
+
+
+class TestCheckTravelRule:
+    """Travel Rule 检查字段校验"""
+
+    @pytest.mark.regression
+    def test_check_travel_rule_missing_link_id(self, payment_api):
+        """TC-PAY-TR-001 缺少 linkId，返回参数错误
+        请求体：缺少 linkId，只传 payerAddress
+        预期结果：HTTP 400/422 或 code≠0
+        """
+        resp = payment_api.post("/v1/smart-payment/travel-rule/check", json={
+            "payerAddress": "0xALICE_ADDR",
+        })
+        if resp.status_code == 404:
+            pytest.skip("smart-payment 接口在当前 SIT 环境未部署（404）")
+        body = resp.json()
+        assert resp.status_code in [400, 422] or body.get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{body}"
+
+    @pytest.mark.regression
+    def test_check_travel_rule_missing_payer_address(self, payment_api):
+        """TC-PAY-TR-002 缺少 payerAddress，返回参数错误
+        请求体：缺少 payerAddress，只传 linkId
+        预期结果：HTTP 400/422 或 code≠0
+        """
+        resp = payment_api.post("/v1/smart-payment/travel-rule/check", json={
+            "linkId": "nonexistent_link_001",
+        })
+        if resp.status_code == 404:
+            pytest.skip("smart-payment 接口在当前 SIT 环境未部署（404）")
+        body = resp.json()
+        assert resp.status_code in [400, 422] or body.get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{body}"
+
+    @pytest.mark.regression
+    def test_check_travel_rule_nonexistent_link(self, payment_api):
+        """TC-PAY-TR-003 不存在的 linkId 触发 Travel Rule 检查，返回业务错误
+        请求体：linkId=不存在，payerAddress=有效地址
+        预期结果：HTTP 非 200 或 code≠0
+        """
+        resp = payment_api.check_travel_rule("nonexistent_link_99999", "0xALICE_ADDR")
+        if resp.status_code == 404:
+            pytest.skip("smart-payment 接口在当前 SIT 环境未部署（404）")
+        body = resp.json()
+        assert resp.status_code != 200 or body.get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{body}"
+
+
+class TestGetPaymentAddress:
+    """获取支付地址异常场景"""
+
+    @pytest.mark.regression
+    def test_get_payment_address_missing_link_id(self, payment_api):
+        """TC-PAY-ADDR-001 缺少 linkId，返回参数错误
+        请求体：空 {}
+        预期结果：HTTP 400/422 或 code≠0
+        """
+        resp = payment_api.post("/v1/smart-payment/payment-address", json={})
+        if resp.status_code == 404:
+            pytest.skip("smart-payment 接口在当前 SIT 环境未部署（404）")
+        body = resp.json()
+        assert resp.status_code in [400, 422] or body.get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{body}"
+
+    @pytest.mark.regression
+    def test_get_payment_address_nonexistent_link(self, payment_api):
+        """TC-PAY-ADDR-002 不存在的 linkId 获取支付地址，返回业务错误
+        请求体：linkId=不存在的 ID
+        预期结果：HTTP 非 200 或 code≠0
+        """
+        resp = payment_api.get_payment_address("nonexistent_link_99999")
+        if resp.status_code == 404:
+            pytest.skip("smart-payment 接口在当前 SIT 环境未部署（404）")
+        body = resp.json()
+        assert resp.status_code != 200 or body.get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{body}"

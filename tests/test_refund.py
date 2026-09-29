@@ -45,6 +45,33 @@ class TestRefundCaseQuery:
         body = resp.json()
         assert resp.status_code != 200 or body.get("code") != 0
 
+    @pytest.mark.regression
+    def test_list_refund_cases_no_status(self, refund_api):
+        """TC-REF-005 不传 status 参数，使用默认值查询
+        前置条件：无
+        请求：GET /v1/refund/cases，不带 status 参数
+        预期结果：HTTP 200，code=0，返回 list 字段（使用服务端默认 status）
+        """
+        resp = refund_api.get("/v1/refund/cases")
+        if resp.status_code == 404:
+            pytest.skip("退款 Case 列表接口在当前 SIT 环境未部署（404）")
+        body = assert_success(resp)
+        assert "list" in body.get("data", {}), "响应 data 中应包含 list 字段"
+
+    @pytest.mark.regression
+    def test_list_refund_cases_invalid_status(self, refund_api):
+        """TC-REF-006 status 传入非法枚举值，返回参数错误
+        前置条件：无
+        请求：GET /v1/refund/cases?status=InvalidStatus
+        预期结果：HTTP 400/422 或 code≠0
+        """
+        resp = refund_api.get("/v1/refund/cases", params={"status": "InvalidStatus"})
+        if resp.status_code == 404:
+            pytest.skip("退款 Case 列表接口在当前 SIT 环境未部署（404）")
+        body = resp.json()
+        assert resp.status_code in [400, 422] or body.get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{body}"
+
 
 class TestRiskReview:
     """风控审核"""
@@ -92,6 +119,46 @@ class TestRiskReview:
         })
         assert resp.status_code in [400, 422] or resp.json().get("code") != 0
 
+    @pytest.mark.regression
+    def test_risk_review_missing_action(self, refund_api):
+        """TC-REF-105 缺少 action 字段，返回参数错误
+        前置条件：无
+        请求体：caseId 存在，但不传 action
+        预期结果：HTTP 400/422 或 code≠0
+        """
+        resp = refund_api.post("/v1/refund/case/test_refund_001/review", json={
+            "caseId": "test_refund_001",
+            "remark": "缺少 action",
+        })
+        assert resp.status_code in [400, 422] or resp.json().get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{resp.json()}"
+
+    @pytest.mark.regression
+    def test_risk_review_nonexistent_case(self, refund_api):
+        """TC-REF-106 对不存在的 caseId 做风控审核，返回业务错误
+        前置条件：无
+        请求：POST /v1/refund/case/nonexistent_refund_99999/review，action=Pass
+        预期结果：HTTP 非 200 或 code≠0
+        """
+        resp = refund_api.risk_review("nonexistent_refund_99999", action="Pass")
+        body = resp.json()
+        assert resp.status_code != 200 or body.get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{body}"
+
+    @pytest.mark.regression
+    def test_risk_review_repeat(self, refund_api):
+        """TC-REF-107 重复风控审核已审核的 Case，返回业务错误
+        前置条件：test_refund_risk_approved_001 已完成风控审核
+        请求：再次对该 Case 执行风控审核 Pass
+        预期结果：HTTP 非 200 或 code≠0（不允许重复审核）
+        """
+        resp = refund_api.risk_review("test_refund_risk_approved_001", action="Pass")
+        if resp.status_code == 404:
+            pytest.skip("测试数据 test_refund_risk_approved_001 不存在于当前环境")
+        body = resp.json()
+        assert resp.status_code != 200 or body.get("code") != 0, \
+            f"重复风控审核应返回错误，实际 {resp.status_code}，响应：{body}"
+
 
 class TestFinanceReview:
     """财务审核"""
@@ -119,6 +186,60 @@ class TestFinanceReview:
         resp = refund_api.finance_review("test_refund_pending_004", action="Pass")
         body = resp.json()
         assert resp.status_code != 200 or body.get("code") != 0, "未经风控审核不应进入财务审核"
+
+    @pytest.mark.regression
+    def test_finance_review_invalid_action(self, refund_api):
+        """TC-REF-204 财务审核 action 传入非法值，返回参数错误
+        前置条件：无
+        请求体：action=InvalidAction
+        预期结果：HTTP 400/422 或 code≠0
+        """
+        resp = refund_api.post(
+            "/v1/refund/case/test_refund_risk_approved_001/finance-review",
+            json={"action": "InvalidAction"},
+        )
+        assert resp.status_code in [400, 422] or resp.json().get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{resp.json()}"
+
+    @pytest.mark.regression
+    def test_finance_review_missing_action(self, refund_api):
+        """TC-REF-205 财务审核缺少 action 字段，返回参数错误
+        前置条件：无
+        请求体：空 {}，不传 action
+        预期结果：HTTP 400/422 或 code≠0
+        """
+        resp = refund_api.post(
+            "/v1/refund/case/test_refund_risk_approved_001/finance-review",
+            json={},
+        )
+        assert resp.status_code in [400, 422] or resp.json().get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{resp.json()}"
+
+    @pytest.mark.regression
+    def test_finance_review_nonexistent_case(self, refund_api):
+        """TC-REF-206 对不存在的 caseId 做财务审核，返回业务错误
+        前置条件：无
+        请求：POST /v1/refund/case/nonexistent_refund_99999/finance-review，action=Pass
+        预期结果：HTTP 非 200 或 code≠0
+        """
+        resp = refund_api.finance_review("nonexistent_refund_99999", action="Pass")
+        body = resp.json()
+        assert resp.status_code != 200 or body.get("code") != 0, \
+            f"实际 {resp.status_code}，响应：{body}"
+
+    @pytest.mark.regression
+    def test_finance_review_repeat(self, refund_api):
+        """TC-REF-207 重复财务审核已审核的 Case，返回业务错误
+        前置条件：test_refund_finance_approved_001 已完成财务审核
+        请求：再次对该 Case 执行财务审核 Pass
+        预期结果：HTTP 非 200 或 code≠0（不允许重复审核）
+        """
+        resp = refund_api.finance_review("test_refund_finance_approved_001", action="Pass")
+        if resp.status_code == 404:
+            pytest.skip("测试数据 test_refund_finance_approved_001 不存在于当前环境")
+        body = resp.json()
+        assert resp.status_code != 200 or body.get("code") != 0, \
+            f"重复财务审核应返回错误，实际 {resp.status_code}，响应：{body}"
 
 
 class TestCompleteRefundFlow:
@@ -154,3 +275,48 @@ class TestCompleteRefundFlow:
             raise
         assert result["kytCaseId"], "kytCaseId 不应为空"
         assert result["refundCaseId"], "refundCaseId 不应为空"
+
+    @pytest.mark.regression
+    def test_refund_risk_reject_flow(self, refund_api):
+        """TC-REF-303 风控审核 Reject 后，Case 状态流转为 Rejected
+        前置条件：test_refund_pending_005 处于 Pending 状态
+        步骤：风控审核 Reject → 查询 Case 状态
+        预期结果：Case status 变为 Rejected
+        """
+        resp = refund_api.risk_review(
+            "test_refund_pending_005",
+            action="Reject",
+            remark="风控审核拒绝，触发流程终止",
+        )
+        if resp.status_code == 404:
+            pytest.skip("测试数据 test_refund_pending_005 不存在于当前环境")
+        assert_success(resp)
+
+        query_resp = refund_api.get_case("test_refund_pending_005")
+        if query_resp.status_code == 404:
+            pytest.skip("查询 Case 接口返回 404")
+        body = assert_success(query_resp)
+        status = body.get("data", {}).get("status")
+        assert status == "Rejected", f"风控拒绝后 status 应为 Rejected，实际：{status}"
+
+    @pytest.mark.regression
+    def test_refund_finance_reject_flow(self, refund_api):
+        """TC-REF-304 财务审核 Reject 后，Case 状态流转为 Rejected
+        前置条件：test_refund_risk_approved_003 处于 RiskApproved 状态
+        步骤：财务审核 Reject → 查询 Case 状态
+        预期结果：Case status 变为 Rejected
+        """
+        resp = refund_api.finance_review(
+            "test_refund_risk_approved_003",
+            action="Reject",
+        )
+        if resp.status_code == 404:
+            pytest.skip("测试数据 test_refund_risk_approved_003 不存在于当前环境")
+        assert_success(resp)
+
+        query_resp = refund_api.get_case("test_refund_risk_approved_003")
+        if query_resp.status_code == 404:
+            pytest.skip("查询 Case 接口返回 404")
+        body = assert_success(query_resp)
+        status = body.get("data", {}).get("status")
+        assert status == "Rejected", f"财务拒绝后 status 应为 Rejected，实际：{status}"

@@ -4,7 +4,10 @@ import pytest
 
 from api.account_api import AccountAPI
 from api.address_api import AddressAPI
+from api.fee_api import FeeAPI
+from api.genius_api import GeniusAPI
 from api.kyc_api import KycAPI
+from api.withdraw_api import WithdrawAPI
 from api.kyt_api import KytAPI
 from api.mock_api import MockAPI
 from api.payment_api import PaymentAPI
@@ -19,8 +22,22 @@ from utils.db_client import query_one
 # ─── API 客户端 ───────────────────────────────────────
 
 @pytest.fixture(scope="session")
+def fee_api():
+    client = FeeAPI(role="merchant")
+    yield client
+    client.close()
+
+
+@pytest.fixture(scope="session")
 def account_api():
     client = AccountAPI(role="merchant")
+    yield client
+    client.close()
+
+
+@pytest.fixture(scope="session")
+def genius_api():
+    client = GeniusAPI(role="merchant")
     yield client
     client.close()
 
@@ -63,6 +80,13 @@ def refund_api():
 @pytest.fixture(scope="session")
 def mock_api():
     client = MockAPI(role="merchant")
+    yield client
+    client.close()
+
+
+@pytest.fixture(scope="session")
+def withdraw_api():
+    client = WithdrawAPI(role="merchant")
     yield client
     client.close()
 
