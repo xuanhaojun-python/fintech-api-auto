@@ -399,3 +399,164 @@ class TestListFxTxns:
         resp = txn_api.post("/v1/txns/fx", json={"pageIndex": 1})
         print(f"\n[TC-TXN-FX-102] {resp.status_code} {resp.json()}")
         assert resp.status_code < 500, f"不应返回 5xx，实际：{resp.status_code}"
+
+
+VALID_WITHDRAW_TXN_ID = "POT2104500906128121856"
+
+
+class TestListWithdrawTxns:
+    """分页查询出金交易列表 POST /v1/txns/withdraw
+
+    实际响应结构：
+    {
+      "code": "0000",
+      "data": {
+        "sum": 1,
+        "pageIndex": 1,
+        "pageSize": 10,
+        "records": [
+          {
+            "txnId": "POT...",
+            "accountId": "ACC...",
+            "status": "PROCESSING",
+            "requestId": "...",
+            "createdAt": 1790587090414,
+            "withdrawalMoney": {"ccy": "USDT", "amount": "0.040000"},
+            "payoutMoney": {"ccy": "USDT", "amount": "0.040000"},
+            "fee": {"money": {"ccy": "USDT", "amount": "0.040000"}},
+            "bene": {"destinationAddress": "0x..."},
+            "returnFee": true
+          }
+        ]
+      }
+    }
+    """
+
+    @pytest.mark.smoke
+    def test_list_withdraw_txns_success(self, txn_api):
+        """TC-TXN-WD-001 分页查询出金交易列表，返回成功
+        预期结果：HTTP 200，code=0000，data 包含 records 和 sum
+        """
+        resp = txn_api.list_withdraw_txns(page_index=1, page_size=10)
+        print(f"\n[TC-TXN-WD-001] {resp.status_code} {resp.json()}")
+        body = assert_success(resp)
+        data = body.get("data", {})
+        assert "records" in data, f"data 缺少 records 字段：{data}"
+        assert "sum" in data, f"data 缺少 sum 字段：{data}"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_records_is_list(self, txn_api):
+        """TC-TXN-WD-002 records 为列表类型"""
+        resp = txn_api.list_withdraw_txns(page_index=1, page_size=10)
+        data = assert_success(resp).get("data", {})
+        assert isinstance(data.get("records"), list), \
+            f"records 应为列表，实际：{type(data.get('records'))}"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_sum_is_non_negative_int(self, txn_api):
+        """TC-TXN-WD-003 sum 为整数且 >= 0"""
+        resp = txn_api.list_withdraw_txns(page_index=1, page_size=10)
+        data = assert_success(resp).get("data", {})
+        assert isinstance(data.get("sum"), int) and data["sum"] >= 0, \
+            f"sum 应为非负整数，实际：{data.get('sum')}"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_sum_gte_records(self, txn_api):
+        """TC-TXN-WD-004 sum 大于等于 records 长度"""
+        resp = txn_api.list_withdraw_txns(page_index=1, page_size=10)
+        data = assert_success(resp).get("data", {})
+        assert data["sum"] >= len(data["records"]), \
+            f"sum({data['sum']}) 应 >= records 长度({len(data['records'])})"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_page_size_limits_records(self, txn_api):
+        """TC-TXN-WD-005 pageSize=5，返回 records 长度 <= 5"""
+        resp = txn_api.list_withdraw_txns(page_index=1, page_size=5)
+        data = assert_success(resp).get("data", {})
+        assert len(data.get("records", [])) <= 5, \
+            f"pageSize=5 时 records 长度应 <= 5，实际：{len(data.get('records', []))}"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_page_index_echoed(self, txn_api):
+        """TC-TXN-WD-006 响应中 pageIndex 与请求一致"""
+        resp = txn_api.list_withdraw_txns(page_index=2, page_size=10)
+        data = assert_success(resp).get("data", {})
+        assert data.get("pageIndex") == 2, \
+            f"pageIndex 应为 2，实际：{data.get('pageIndex')}"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_page_size_echoed(self, txn_api):
+        """TC-TXN-WD-007 响应中 pageSize 与请求一致"""
+        resp = txn_api.list_withdraw_txns(page_index=1, page_size=20)
+        data = assert_success(resp).get("data", {})
+        assert data.get("pageSize") == 20, \
+            f"pageSize 应为 20，实际：{data.get('pageSize')}"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_record_structure(self, txn_api):
+        """TC-TXN-WD-008 records 中每条记录包含关键字段
+        预期字段：txnId、accountId、status、requestId、createdAt、withdrawalMoney
+        """
+        resp = txn_api.list_withdraw_txns(page_index=1, page_size=10)
+        data = assert_success(resp).get("data", {})
+        if not data.get("records"):
+            pytest.skip("暂无出金交易记录，跳过字段结构验证")
+        for record in data["records"]:
+            for field in ("txnId", "accountId", "status", "requestId",
+                          "createdAt", "withdrawalMoney"):
+                assert field in record, f"记录缺少字段 {field}：{record}"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_txn_id_prefix(self, txn_api):
+        """TC-TXN-WD-009 records 中 txnId 以 POT 开头"""
+        resp = txn_api.list_withdraw_txns(page_index=1, page_size=10)
+        data = assert_success(resp).get("data", {})
+        if not data.get("records"):
+            pytest.skip("暂无出金交易记录，跳过 txnId 前缀验证")
+        for record in data["records"]:
+            assert record["txnId"].startswith("POT"), \
+                f"出金 txnId 应以 POT 开头，实际：{record['txnId']}"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_withdrawal_money_positive(self, txn_api):
+        """TC-TXN-WD-010 withdrawalMoney.amount > 0"""
+        resp = txn_api.list_withdraw_txns(page_index=1, page_size=10)
+        data = assert_success(resp).get("data", {})
+        if not data.get("records"):
+            pytest.skip("暂无出金交易记录，跳过金额校验")
+        for record in data["records"]:
+            amount = float(record.get("withdrawalMoney", {}).get("amount", 0))
+            assert amount > 0, f"withdrawalMoney.amount 应大于 0：{record}"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_created_at_timestamp(self, txn_api):
+        """TC-TXN-WD-011 createdAt 为 13 位毫秒时间戳"""
+        resp = txn_api.list_withdraw_txns(page_index=1, page_size=10)
+        data = assert_success(resp).get("data", {})
+        if not data.get("records"):
+            pytest.skip("暂无出金交易记录，跳过时间戳验证")
+        for record in data["records"]:
+            created_at = record.get("createdAt", 0)
+            assert isinstance(created_at, int) and len(str(created_at)) == 13, \
+                f"createdAt 应为 13 位时间戳，实际：{created_at}"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_response_time(self, txn_api):
+        """TC-TXN-WD-012 接口响应时间在 3000ms 以内"""
+        resp = txn_api.list_withdraw_txns(page_index=1, page_size=10)
+        assert_success(resp)
+        assert_response_time(resp, max_ms=3000)
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_missing_page_index(self, txn_api):
+        """TC-TXN-WD-101 缺少 pageIndex，返回 400 或使用默认值"""
+        resp = txn_api.post("/v1/txns/withdraw", json={"pageSize": 10})
+        print(f"\n[TC-TXN-WD-101] {resp.status_code} {resp.json()}")
+        assert resp.status_code < 500, f"不应返回 5xx，实际：{resp.status_code}"
+
+    @pytest.mark.regression
+    def test_list_withdraw_txns_missing_page_size(self, txn_api):
+        """TC-TXN-WD-102 缺少 pageSize，返回 400 或使用默认值"""
+        resp = txn_api.post("/v1/txns/withdraw", json={"pageIndex": 1})
+        print(f"\n[TC-TXN-WD-102] {resp.status_code} {resp.json()}")
+        assert resp.status_code < 500, f"不应返回 5xx，实际：{resp.status_code}"

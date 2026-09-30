@@ -33,3 +33,15 @@ class TxnAPI(BaseClient):
             payload["status"] = status
         return self.post("/v1/txns/fx", headers=headers, json=payload)
 
+    def list_withdraw_txns(self, page_index: int = 1, page_size: int = 10,
+                           account_id: str = None, ccy: str = None,
+                           status: str = None):
+        """分页查询出金交易列表 POST /v1/txns/withdraw"""
+        headers = {"X-ON-BEHALF-OF": account_id} if account_id else {}
+        payload = {"pageIndex": page_index, "pageSize": page_size}
+        if ccy is not None:
+            payload["ccy"] = ccy
+        if status is not None:
+            payload["status"] = status
+        return self.post("/v1/txns/withdraw", headers=headers, json=payload)
+
