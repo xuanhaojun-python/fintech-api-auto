@@ -8,6 +8,8 @@ from api.fee_api import FeeAPI
 from api.genius_api import GeniusAPI
 from api.kyc_api import KycAPI
 from api.withdraw_api import WithdrawAPI
+from api.txn_api import TxnAPI
+from api.quote_api import QuoteAPI
 from api.kyt_api import KytAPI
 from api.mock_api import MockAPI
 from api.payment_api import PaymentAPI
@@ -87,6 +89,20 @@ def mock_api():
 @pytest.fixture(scope="session")
 def withdraw_api():
     client = WithdrawAPI(role="merchant")
+    yield client
+    client.close()
+
+
+@pytest.fixture(scope="session")
+def txn_api():
+    client = TxnAPI(role="merchant")
+    yield client
+    client.close()
+
+
+@pytest.fixture(scope="session")
+def quote_api():
+    client = QuoteAPI(role="merchant")
     yield client
     client.close()
 
