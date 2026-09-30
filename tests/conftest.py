@@ -4,6 +4,7 @@ import pytest
 
 from api.account_api import AccountAPI
 from api.address_api import AddressAPI
+from api.beneficiary_api import BeneficiaryAPI
 from api.fee_api import FeeAPI
 from api.genius_api import GeniusAPI
 from api.kyc_api import KycAPI
@@ -26,6 +27,13 @@ from utils.db_client import query_one
 @pytest.fixture(scope="session")
 def fee_api():
     client = FeeAPI(role="merchant")
+    yield client
+    client.close()
+
+
+@pytest.fixture(scope="session")
+def beneficiary_api():
+    client = BeneficiaryAPI(role="merchant")
     yield client
     client.close()
 
