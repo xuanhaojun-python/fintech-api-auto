@@ -99,3 +99,8 @@ class AddressAPI(BaseClient):
         items: [{"ccy": "USDT", "protocol": "ETHEREUM", "accountId": "ACC..."}]
         """
         return self.post("/v1/account/deposit-address/dispatch", json=items)
+
+    def get_recharge_addresses(self, account_id: str = None):
+        """查询充值地址列表 GET /v1/address/deposit"""
+        headers = {"X-ON-BEHALF-OF": account_id} if account_id else {}
+        return self.get("/v1/address/deposit", headers=headers)
