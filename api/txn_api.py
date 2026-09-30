@@ -21,3 +21,15 @@ class TxnAPI(BaseClient):
             payload["status"] = status
         return self.post("/v1/txns/deposit", headers=headers, json=payload)
 
+    def list_fx_txns(self, page_index: int = 1, page_size: int = 10,
+                     account_id: str = None, ccy_pair: str = None,
+                     status: str = None):
+        """分页查询换汇交易列表 POST /v1/txns/fx"""
+        headers = {"X-ON-BEHALF-OF": account_id} if account_id else {}
+        payload = {"pageIndex": page_index, "pageSize": page_size}
+        if ccy_pair is not None:
+            payload["ccyPair"] = ccy_pair
+        if status is not None:
+            payload["status"] = status
+        return self.post("/v1/txns/fx", headers=headers, json=payload)
+
