@@ -15,6 +15,7 @@ from api.kyt_api import KytAPI
 from api.mock_api import MockAPI
 from api.payment_api import PaymentAPI
 from api.refund_api import RefundAPI
+from api.sales_api import SalesAPI
 from service.payment_service import PaymentService
 from service.refund_service import RefundService
 from utils.assertions import assert_success
@@ -111,6 +112,13 @@ def txn_api():
 @pytest.fixture(scope="session")
 def quote_api():
     client = QuoteAPI(role="merchant")
+    yield client
+    client.close()
+
+
+@pytest.fixture(scope="session")
+def sales_api():
+    client = SalesAPI(role="merchant")
     yield client
     client.close()
 
